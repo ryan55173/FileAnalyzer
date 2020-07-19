@@ -19,7 +19,7 @@ public class Window {
     private static final String TITLE = "File Analyzer";
     private static final int WIDTH = 600, HEIGHT = 800;
     private static final String ICON_PATH = "data\\angry_cat.ico";
-    private static final int BUTTON_FONT_SIZE = 24;
+    private static final int BUTTON_FONT_SIZE = 16;
     private static final int WINDOW_FONT_SIZE = 16;
     private static final int VIEW_WIDTH_CHAR = 60;  // For font-size 16
     // Obj cont...
@@ -31,6 +31,9 @@ public class Window {
     private JTextPane rootDirPane;
     private JDialog constraintSelection;
     private ArrayList<JCheckBox> checkBoxes;
+    private JDialog searchOptions;
+    private JTextField searchTextField;
+    private ArrayList<JRadioButton> searchOptionParams;
 
     // Constructor and initialization
     public Window() {
@@ -136,6 +139,15 @@ public class Window {
         analyzeButton.setBorder(buttonBorder);
         analyzeButton.addActionListener(e -> analyzeButtonAction());
         analyzeButton.setEnabled(true);
+        // File search button
+        JButton fileSearchButton = new JButton();
+        fileSearchButton.setBackground(Color.GREEN);
+        fileSearchButton.setForeground(Color.BLACK);
+        fileSearchButton.setFont(buttonFont);
+        fileSearchButton.setText("File Search");
+        fileSearchButton.setBorder(buttonBorder);
+        fileSearchButton.addActionListener(e -> fileSearchAction());
+        fileSearchButton.setEnabled(true);
         // Close button
         JButton closeButton = new JButton();
         closeButton.setBackground(Color.GREEN);
@@ -148,6 +160,7 @@ public class Window {
         // Components add
         buttonPanel.add(rootPathButton);
         buttonPanel.add(analyzeButton);
+        buttonPanel.add(fileSearchButton);
         buttonPanel.add(closeButton);
         mainPanel.add(outputScroll, BorderLayout.CENTER);
         //mainPanel.add(scrollBar, BorderLayout.EAST);
@@ -231,8 +244,111 @@ public class Window {
         boolean blendSelected = this.checkBoxes.get(0).isSelected();
         boolean mayaSelected = this.checkBoxes.get(1).isSelected();
         boolean metaSelected = this.checkBoxes.get(2).isSelected();
-        this.fileSys.analyzeFiles(blendSelected, mayaSelected, metaSelected);
+        clearDisplayOutput();
         this.constraintSelection.dispose();
+        this.fileSys.analyzeFiles(blendSelected, mayaSelected, metaSelected);
+    }
+    private void fileSearchAction() {
+        this.searchOptions = new JDialog();
+        this.searchOptions.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        this.searchOptions.setLayout(new BorderLayout());
+        Dimension searchOptionsSize = new Dimension(400, 400);
+        this.searchOptions.setMinimumSize(searchOptionsSize);
+        this.searchOptions.setMaximumSize(searchOptionsSize);
+        this.searchOptions.setPreferredSize(searchOptionsSize);
+        this.searchOptions.setTitle("Search Parameters");
+        this.searchOptions.setResizable(false);
+        // Search components
+        JPanel mainSearchPanel = new JPanel(); // Main panel
+        mainSearchPanel.setLayout(new BoxLayout(mainSearchPanel, BoxLayout.Y_AXIS));
+        JPanel searchTextPanel = new JPanel();
+        searchTextPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        JLabel searchTextLabel = new JLabel();
+        searchTextLabel.setText("Search Query: ");
+        this.searchTextField = new JTextField(24);
+        this.searchTextField.setEditable(true);
+        searchTextPanel.add(searchTextLabel);
+        searchTextPanel.add(this.searchTextField);
+        mainSearchPanel.add(searchTextPanel);
+        JPanel bottomSearchPanel = new JPanel(); // Buttons panel
+        bottomSearchPanel.setLayout(new BorderLayout());
+        JButton searchButton = new JButton();
+        searchButton.setText("Search");
+        searchButton.addActionListener(e -> searchButtonAction());
+        bottomSearchPanel.add(searchButton, BorderLayout.CENTER);
+        JPanel searchParamPanel = new JPanel();
+        searchParamPanel.setLayout(new FlowLayout());
+        ButtonGroup searchParamGroup = new ButtonGroup();
+        JRadioButton fileSearch = new JRadioButton();
+        fileSearch.setText("Search Files");
+        fileSearch.setSelected(true);
+        JRadioButton directorySearch = new JRadioButton();
+        directorySearch.setText("Search Directories");
+        directorySearch.setSelected(false);
+        searchParamGroup.add(fileSearch);
+        searchParamGroup.add(directorySearch);
+        searchParamPanel.add(fileSearch);
+        searchParamPanel.add(directorySearch);
+        this.searchOptionParams = new ArrayList<>();
+        this.searchOptionParams.add(fileSearch);
+        this.searchOptionParams.add(directorySearch);
+        // Add components to container
+        this.searchOptions.add(searchParamPanel, BorderLayout.NORTH);
+        this.searchOptions.add(mainSearchPanel, BorderLayout.CENTER);
+        this.searchOptions.add(bottomSearchPanel, BorderLayout.SOUTH);
+        this.searchOptions.setLocationRelativeTo(null);
+        this.searchOptions.setVisible(true);
+    }
+    private void searchButtonAction() {
+        // Get search string
+        String searchString = this.searchTextField.getText();
+        // Get search type
+        boolean doFileSearch;
+        doFileSearch = this.searchOptionParams.get(0).isSelected();
+        // Prep search
+        this.searchOptions.dispose();
+        clearDisplayOutput();
+        addOutput("Searching query...");
+        // Search
+        this.fileSys.prepareSearch();
+        ArrayList<File> searchMatches = new ArrayList<>();
+        if (doFileSearch) {
+            // Search files
+            for (File checkFile : this.fileSys.getProjectFiles()) {
+                String filePathFull = checkFile.getAbsolutePath();
+                String[] pathParts = filePathFull.split("\\\\");
+                String checkString = pathParts[(pathParts.length - 1)];
+                if (checkString.contains(searchString)) {
+                    searchMatches.add(checkFile);
+                }
+            }
+        } else {
+            // Search directories
+            for (File checkFile : this.fileSys.getProjectDirectories()) {
+                String filePathFull = checkFile.getAbsolutePath();
+                String[] pathParts = filePathFull.split("\\\\");
+                String checkString = pathParts[(pathParts.length - 1)];
+                if (checkString.contains(searchString)) {
+                    searchMatches.add(checkFile);
+                }
+            }
+        }
+        // Return matches from search
+        int resultsFound = searchMatches.size();
+        if (resultsFound == 0) {
+            // No matches found
+            addOutput("No results found from your query...");
+            return;
+        } else if (resultsFound > 500) {
+            addOutput("Too many results found to display");
+        } else {
+            for (File matchFile : searchMatches) {
+                String outputString = "Match: " + matchFile.getAbsolutePath();
+                addOutput(outputString);
+                resultsFound += 1;
+            }
+        }
+        addOutput("Found Results: " + resultsFound);
     }
 
     // Methods
@@ -280,6 +396,10 @@ public class Window {
         }
         displayOutput();
     }
+    public void clearDisplayOutput() {
+        this.outputLines.clear();
+        this.outputTextPane.setText("");
+    }
     private void displayOutput() {
         StringBuilder fullPrintBuilder = new StringBuilder();
         if (this.outputLines.size() == 0) {
@@ -291,6 +411,7 @@ public class Window {
         }
         this.outputTextPane.setText(fullPrintBuilder.toString());
     }
+
 
     // Main method
     public static void main(String[] args) {
